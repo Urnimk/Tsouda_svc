@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tsouda_svc V1.0</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script defer src="{{ url_for('static', filename='app.js') }}"></script>
+</head><body data-active="{{ '1' if job and job.active else '0' }}" data-status="{{ url_for('status', key=key) if key else '' }}">
+<header><div><p class="eyebrow">LOCAL VOICE WORKSTATION · RVC V2</p><h1>Tsouda_svc <small>V1.0</small></h1><p>用自己的演唱，轉換成已訓練的目標音色。</p></div>
+<div class="hardware"><strong>{{ gpu.name if gpu.ready else 'CUDA 未就緒 · CPU 模式可用' }}</strong>
+{% if gpu.ready %}<span>{{ gpu.memory }} GiB VRAM</span>{% endif %}<span id="gpu"></span></div></header>
+<main>
+{% macro hidden() %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endmacro %}
+{% macro device(name, cpu_default=false) %}
+<select name="{{ name }}" aria-label="{{ '特徵提取裝置' if name == 'features' else '運算裝置' }}">
+<option value="gpu" {{ 'disabled' if not gpu.ready }} {{ 'selected' if gpu.ready and not cpu_default }}>GPU 0</option>
+<option value="cpu" {{ 'selected' if cpu_default or not gpu.ready }}>CPU</option>
+</select>
+{% endmacro %}
+{% macro fallback() %}<label class="check"><input type="checkbox" name="fallback" checked> 記憶體不足時自動降級</label>{% endmacro %}
+{% if message %}<p class="notice" role="status">{{ message }}</p>{% endif %}
+<section><h2>歌手專案</h2><nav aria-label="歌手專案">
+{% for id,name in singers %}<a class="{{ 'selected' if id == key }}" href="{{ url_for('home', singer=id) }}">{{ name }}</a>{% endfor %}
+</nav>
+<form class="row" method="post" action="{{ url_for('add_singer') }}">{{ hidden() }}
+<label>歌手名稱 <input required maxlength="64" name="name" placeholder="例如：我的歌手模型"></label>
+<button>新增歌手</button></form></section>
+{% if key %}
+<section><div class="heading"><h2>1　匯入與檢查 WAV</h2><span>{{ files|length }} 檔／{{ '%.1f'|format(duration/60) }} 分鐘</span></div>
+<form class="row" method="post" enctype="multipart/form-data" action="{{ url_for('action', key=key, action='import') }}">{{ hidden() }}
+<label>單人乾聲 WAV <input required type="file" accept=".wav" multiple name="files"></label><button>匯入並檢查</button></form>
+<p class="hint">建議每段 2～15 秒。可一次選多檔，會檢查檔案內容、長度、取樣率、音量及疑似削波，並排除重複檔。</p>
+{% if files %}<div class="scroll"><table><thead><tr><th>原始檔名</th><th>格式</th><th>秒數</th><th>RMS dBFS</th><th>品質提示</th><th>操作</th></tr></thead><tbody>
+{% for file,m in files %}<tr><td>{{ m.name }}</td><td>{{ m.rate }} Hz／{{ m.channels }} 聲道／{{ m.subtype }}</td><td>{{ m.seconds }}</td><td>{{ m.rms_db }}</td><td>{{ m.warnings|join('、') or '通過基本檢查' }}</td><td>
+<form method="post" action="{{ url_for('action', key=key, action='remove') }}">{{ hidden() }}<input type="hidden" name="file" value="{{ file }}"><button class="subtle" data-remove>移除</button></form>
+</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+</section>
+<section><div class="heading"><h2>2　預處理與訓練</h2><span>32 kHz · F0 · RVC v2</span></div>
+<p class="hint">{{ ('資料已備妥，最近完整檢查點為第 ' ~ epoch ~ ' 輪。') if run else '這組資料尚未預處理。啟動訓練時會自動準備。' }} 重新預處理會建立獨立訓練批次。</p>
+<form class="row" method="post" action="{{ url_for('action', key=key, action='prepare') }}">{{ hidden() }}
+<label>特徵提取 {{ device('features',true) }}</label>{{ fallback() }}<button class="subtle" {{ 'disabled' if not files }}>只做預處理</button></form>
+<form class="row train" method="post" action="{{ url_for('action', key=key, action='train') }}">{{ hidden() }}
+<label>訓練裝置 {{ device('device') }}</label><label>特徵提取 {{ device('features',true) }}</label>
+<label>總 Epoch <input name="epochs" type="number" value="{{ [100, epoch + 20]|max if epoch < 1200 else 1200 }}" min="1" max="1200" required></label>
+<label>每幾輪保存 <input name="interval" type="number" value="20" min="1" max="1200" required></label>
+<label>Batch <input name="batch" type="number" value="{{ 1 if not gpu.ready else (4 if gpu.memory >= 10 else 2) }}" min="1" max="16" required></label>
+{{ fallback() }}<button {{ 'disabled' if not files }}>開始／續訓</button></form>
+<form class="row" id="pause-form" method="post" action="{{ url_for('action', key=key, action='pause') }}" hidden>
+{{ hidden() }}<button type="submit" id="pause-training">暫停訓練</button>
+<span class="hint">存完當前輪次後釋放 GPU，可用模型轉換音色。</span>
+</form>
+<div class="monitor"><div class="heading"><h3>工作進度與 Loss</h3><span id="state" aria-live="polite">{{ job.status if job else '待命' }}</span></div>
+{% if job %}<a href="{{ url_for('logfile', key=key, log=job.log.stem) }}">下載本次完整紀錄</a>{% endif %}
+<progress id="progress" hidden aria-label="已完成訓練輪數"></progress><span id="epoch-progress"></span>
+<p id="loss" class="hint"></p><pre id="log">尚無工作紀錄</pre>
+{% if logs %}<details><summary>最近工作紀錄</summary><ul>{% for entry in logs %}<li><a href="{{ url_for('logfile', key=key, log=entry.stem) }}">{{ entry.name }}</a></li>{% endfor %}</ul></details>{% endif %}</div>
+</section>
+<section><div class="heading"><h2>3　模型管理與歌聲轉換</h2><span>{{ models|length }} 個模型</span></div>
+{% if models %}
+<details><summary>查看／下載訓練模型</summary><ul>
+{% for model,idx,label in models %}<li><a href="{{ url_for('model_download', key=key, name=model) }}">{{ label }}</a>　{{ '有配對索引' if idx else '無索引' }}</li>{% endfor %}
+</ul></details>
+<form class="row" method="post" enctype="multipart/form-data" action="{{ url_for('action', key=key, action='convert') }}">{{ hidden() }}
+<label>推論模型 <select name="model" id="model" required>{% for model,idx,label in models %}<option value="{{ model }}" data-index="{{ '1' if idx else '0' }}">{{ label }}</option>{% endfor %}</select></label>
+<label>你的演唱 WAV <input required type="file" name="vocal" accept=".wav"></label>
+<label>轉換裝置 {{ device('device') }}</label>
+<label>移調（半音） <input type="number" name="pitch" min="-24" max="24" value="0" required></label>
+<label>索引比例（%） <input id="index-rate" type="number" name="index" min="0" max="100" value="{{ 35 if models[0][1] else 0 }}" required></label>
+{{ fallback() }}<button>開始轉換</button>
+</form>
+<p class="hint">保持 0 半音，讓 RMVPE 依原唱音高曲線引導音色轉換。使用單人乾聲，完成後再混入伴奏。</p>
+{% else %}<p>完成第一個訓練檢查點後，即可在這裡選擇模型並轉換。</p>{% endif %}
+</section>
+<section><h2>4　原聲與轉換結果 A/B</h2>
+{% for conversion,info in conversions %}
+<article class="comparison"><h3>{{ info.name }}</h3><p class="hint">{{ info.model }} · 移調 {{ info.pitch }} 半音</p>
+<div class="ab">
+<div><strong>A　原始演唱</strong><audio controls preload="metadata" src="{{ url_for('audio', key=key, conversion=conversion, variant='original') }}"></audio></div>
+<div><strong>B　轉換結果</strong><audio controls preload="metadata" src="{{ url_for('audio', key=key, conversion=conversion, variant='converted') }}"></audio></div>
+</div><button class="subtle switch" type="button">在同一時間點切換 A/B</button>
+<a class="download" href="{{ url_for('audio', key=key, conversion=conversion, variant='converted', download=1) }}">下載 WAV</a></article>
+{% else %}<p class="hint">轉換完成後，結果會顯示在這裡。</p>{% endfor %}
+</section>
+{% endif %}
+</main></body></html>

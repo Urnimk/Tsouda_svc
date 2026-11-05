@@ -1,0 +1,14 @@
+# Install matching torch and torchaudio first (see setup_windows.bat).
+Flask==3.1.2
+numpy==1.26.4
+scipy==1.15.3
+librosa==0.10.2.post1
+soundfile==0.13.1
+av==15.1.0
+transformers==4.49.0
+faiss-cpu==1.11.0
+scikit-learn==1.6.1
+tensorboard==2.19.0
+praat-parselmouth==0.4.6
+ffmpeg-python==0.2.0
+matplotlib==3.10.3

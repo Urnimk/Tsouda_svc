@@ -1,0 +1,50 @@
+{
+  "ffmpeg.exe": {
+    "dest": "ffmpeg.exe",
+    "size": 52925440,
+    "sha256": "b6a4d917a444790f4c06ada640c1c0c95aecde2f8953ed8d0dfb19352500bfcd",
+    "blob": "ddf3337846e74afb16a20a0f5405f10072199a06"
+  },
+  "ffprobe.exe": {
+    "dest": "ffprobe.exe",
+    "size": 122135040,
+    "sha256": "2da5b980a9a14a808f423d181c4ed51c2b8af11b1366699f3f7eab0609926f8f",
+    "blob": "0cf5cc2a4e1e28d32820c0709996b386531fbde0"
+  },
+  "hubert_base/config.json": {
+    "dest": "assets/hubert_base/config.json",
+    "size": 1492,
+    "sha256": null,
+    "blob": "6f40f9bd2481c05c03d59f2b36f016fedc386187"
+  },
+  "hubert_base/preprocessor_config.json": {
+    "dest": "assets/hubert_base/preprocessor_config.json",
+    "size": 225,
+    "sha256": null,
+    "blob": "3cb012fae1b439d92a815fec1c09fa0ce19fd6bf"
+  },
+  "hubert_base/pytorch_model.bin": {
+    "dest": "assets/hubert_base/pytorch_model.bin",
+    "size": 189206711,
+    "sha256": "cc8c20f4b90a520757260197a3ff2505705a7adbd20ad9eeaa4e1a9b38442ef5",
+    "blob": "fb3a5fe04eb3c9d151df50b9b91b8b142714f348"
+  },
+  "pretrained_v2/f0D32k.pth": {
+    "dest": "assets/pretrained_v2/f0D32k.pth",
+    "size": 142875703,
+    "sha256": "bd7134e7793674c85474d5145d2d982e3c5d8124fc7bb6c20f710ed65808fa8a",
+    "blob": "7449cc83c3f97fd87c62596f005d262120b64772"
+  },
+  "pretrained_v2/f0G32k.pth": {
+    "dest": "assets/pretrained_v2/f0G32k.pth",
+    "size": 73950049,
+    "sha256": "2332611297b8d88c7436de8f17ef5f07a2119353e962cd93cda5806d59a1133d",
+    "blob": "6bff869bb04fae663dddd1fbe5c04b497bfc4209"
+  },
+  "rmvpe.pt": {
+    "dest": "assets/rmvpe/rmvpe.pt",
+    "size": 181184272,
+    "sha256": "6d62215f4306e3ca278246188607209f09af3dc77ed4232efdd069798c4ec193",
+    "blob": "6362f060846875c3b5d7012adea5f97e47305e7e"
+  }
+}
